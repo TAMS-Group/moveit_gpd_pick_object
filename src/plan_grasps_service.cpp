@@ -28,7 +28,6 @@ public:
       pose = gpd_grasp_to_pose(grasp, frame_id);
       pose_pub_.publish(pose);
     }
-
   }
 
   geometry_msgs::PoseStamped gpd_grasp_to_pose(gpd::GraspConfig grasp, std::string frame_id)
@@ -46,6 +45,8 @@ public:
     pose.pose.orientation = orientation_quat_msg;
 
     pose.pose.position = grasp.top;
+
+    return pose;
   }
 
   bool plan_gpd_grasp(moveit_msgs::GraspPlanning::Request &req, moveit_msgs::GraspPlanning::Response &res)
