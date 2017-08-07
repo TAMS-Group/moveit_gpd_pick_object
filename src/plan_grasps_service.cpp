@@ -5,6 +5,7 @@
 #include <mutex>
 #include <tf/transform_datatypes.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/PoseArray.h>
 
 #include <moveit/move_group_interface/move_group_interface.h>
 
@@ -14,26 +15,25 @@ public:
   PlanGPDGrasp(ros::NodeHandle n)
   {
     clustered_grasps_sub_ = n.subscribe("/detect_grasps/clustered_grasps", 1000, &PlanGPDGrasp::clustered_grasps_callback, this);
-    pose_pub_ = n.advertise<geometry_msgs::PoseStamped>("tool_pose", 1000);
+    pose_pub_ = n.advertise<geometry_msgs::PoseArray>("tool_poses", 1000);
   }
 
   void clustered_grasps_callback(const gpd::GraspConfigList::ConstPtr& msg)
   {
     std::lock_guard<std::mutex> lock(m_);
     grasp_candidates_ = *msg;
-    geometry_msgs::PoseStamped pose;
-    std::string frame_id = grasp_candidates_.header.frame_id;
+    geometry_msgs::PoseArray pose_array;
+    pose_array.header.frame_id = "kinect2_rgb_optical_frame";//grasp_candidates_.header.frame_id;
     for(auto grasp:grasp_candidates_.grasps)
     {
-      pose = gpd_grasp_to_pose(grasp, frame_id);
-      pose_pub_.publish(pose);
+      pose_array.poses.push_back(gpd_grasp_to_pose(grasp));
+      pose_pub_.publish(pose_array);
     }
   }
 
-  geometry_msgs::PoseStamped gpd_grasp_to_pose(gpd::GraspConfig grasp, std::string frame_id)
+  geometry_msgs::Pose gpd_grasp_to_pose(gpd::GraspConfig grasp)
   {
-    geometry_msgs::PoseStamped pose;
-    pose.header.frame_id = frame_id;
+    geometry_msgs::Pose pose;
     tf::Matrix3x3 orientation(grasp.approach.x, grasp.approach.y, grasp.approach.z,
                               grasp.binormal.x, grasp.binormal.y, grasp.binormal.z,
                               -grasp.axis.x, -grasp.axis.y, -grasp.axis.z);
@@ -42,9 +42,8 @@ public:
     orientation.getRotation(orientation_quat);
     geometry_msgs::Quaternion orientation_quat_msg;
     tf::quaternionTFToMsg(orientation_quat, orientation_quat_msg);
-    pose.pose.orientation = orientation_quat_msg;
-
-    pose.pose.position = grasp.top;
+    pose.orientation = orientation_quat_msg;
+    pose.position = grasp.top;
 
     return pose;
   }
@@ -76,7 +75,8 @@ public:
       }
     }
 
-    grasp.grasp_pose = gpd_grasp_to_pose(best_grasp, frame_id);
+    grasp.grasp_pose.header.frame_id = frame_id;
+    grasp.grasp_pose.pose = gpd_grasp_to_pose(best_grasp);
 
     grasp.pre_grasp_approach.min_distance = 0.08;
     grasp.pre_grasp_approach.desired_distance = 0.1;
