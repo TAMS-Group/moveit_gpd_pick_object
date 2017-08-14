@@ -1,11 +1,13 @@
 #include <ros/ros.h>
 #include <moveit_msgs/GraspPlanning.h>
+#include <moveit_msgs/CollisionObject.h>
 #include <gpd/GraspConfigList.h>
 #include <gpd/GraspConfig.h>
 #include <mutex>
 #include <tf/transform_datatypes.h>
+#include <tf/transform_listener.h>
 #include <geometry_msgs/PoseStamped.h>
-#include <geometry_msgs/PoseArray.h>
+#include <geometry_msgs/PointStamped.h>
 
 #include <moveit/move_group_interface/move_group_interface.h>
 
@@ -15,28 +17,20 @@ public:
   PlanGPDGrasp(ros::NodeHandle n)
   {
     clustered_grasps_sub_ = n.subscribe("/detect_grasps/clustered_grasps", 1000, &PlanGPDGrasp::clustered_grasps_callback, this);
-    pose_pub_ = n.advertise<geometry_msgs::PoseArray>("tool_poses", 1000);
   }
 
   void clustered_grasps_callback(const gpd::GraspConfigList::ConstPtr& msg)
   {
     std::lock_guard<std::mutex> lock(m_);
     grasp_candidates_ = *msg;
-    geometry_msgs::PoseArray pose_array;
-    pose_array.header.frame_id = "kinect2_rgb_optical_frame";//grasp_candidates_.header.frame_id;
-    for(auto grasp:grasp_candidates_.grasps)
-    {
-      pose_array.poses.push_back(gpd_grasp_to_pose(grasp));
-      pose_pub_.publish(pose_array);
-    }
   }
 
   geometry_msgs::Pose gpd_grasp_to_pose(gpd::GraspConfig grasp)
   {
     geometry_msgs::Pose pose;
-    tf::Matrix3x3 orientation(grasp.approach.x, grasp.approach.y, grasp.approach.z,
-                              grasp.binormal.x, grasp.binormal.y, grasp.binormal.z,
-                              -grasp.axis.x, -grasp.axis.y, -grasp.axis.z);
+    tf::Matrix3x3 orientation(grasp.approach.x, grasp.binormal.x, grasp.axis.x,
+                              grasp.approach.y, grasp.binormal.y, grasp.axis.y,
+                              grasp.approach.z, grasp.binormal.z, grasp.axis.z);
 
     tf::Quaternion orientation_quat;
     orientation.getRotation(orientation_quat);
@@ -52,43 +46,72 @@ public:
   {
     moveit::planning_interface::MoveGroupInterface move_group(req.group_name);
     moveit::planning_interface::MoveGroupInterface gripper(move_group.getRobotModel()->getEndEffectors()[0]->getName());
+    moveit_msgs::CollisionObject co = req.target;
+    double x_bound = co.primitives[0].dimensions[0];
+    double y_bound = co.primitives[0].dimensions[1]/2.0;
+    double z_bound = co.primitives[0].dimensions[2]/2.0;
 
     moveit_msgs::Grasp grasp;
     grasp.id = "grasp";
 
     jointValuesToJointTrajectory(gripper.getNamedTargetValues("open"), ros::Duration(1.0), grasp.pre_grasp_posture);
     jointValuesToJointTrajectory(gripper.getNamedTargetValues("closed"), ros::Duration(2.0), grasp.grasp_posture);
-    std::string frame_id;
 
     gpd::GraspConfig best_grasp = grasp_candidates_.grasps.at(0);
-
+    best_grasp.score.data = -1;
+    
+    geometry_msgs::PointStamped grasp_point;
+    grasp_point.header.frame_id = "kinect2_rgb_optical_frame";
+    geometry_msgs::PointStamped transformed_grasp_point;
+    
     {
       std::lock_guard<std::mutex> lock(m_);
-      frame_id = grasp_candidates_.header.frame_id;
-      grasp.pre_grasp_approach.direction.header.frame_id = frame_id;
       for (auto grasp_candidate:grasp_candidates_.grasps)
       {
-        if (grasp_candidate.score.data > best_grasp.score.data)
+        grasp_point.point = grasp_candidate.top;
+        try
         {
+          listener_.transformPoint(co.header.frame_id, grasp_point, transformed_grasp_point); 
+        }
+        catch( tf::TransformException ex)
+        {
+          ROS_ERROR("transfrom exception : %s",ex.what());
+        }
+
+        if (transformed_grasp_point.point.x < x_bound && transformed_grasp_point.point.x > -x_bound && transformed_grasp_point.point.y < y_bound && transformed_grasp_point.point.y > -y_bound && transformed_grasp_point.point.z < z_bound && transformed_grasp_point.point.z > 0.0 && grasp_candidate.score.data > best_grasp.score.data)
+        { 
+          ROS_INFO("Found grasp");
           best_grasp = grasp_candidate;
         }
       }
     }
+    if(best_grasp.score.data == -1)
+    {
+      ROS_ERROR("No valid grasp found.");
+      return false;
+    }
 
-    grasp.grasp_pose.header.frame_id = frame_id;
+    grasp.grasp_pose.header.frame_id = "kinect2_rgb_optical_frame";
     grasp.grasp_pose.pose = gpd_grasp_to_pose(best_grasp);
 
     grasp.pre_grasp_approach.min_distance = 0.08;
     grasp.pre_grasp_approach.desired_distance = 0.1;
+    grasp.pre_grasp_approach.direction.header.frame_id = "kinect2_rgb_optical_frame";
     grasp.pre_grasp_approach.direction.vector.x = best_grasp.approach.x;
     grasp.pre_grasp_approach.direction.vector.y = best_grasp.approach.y;
     grasp.pre_grasp_approach.direction.vector.z = best_grasp.approach.z;
 
     grasp.post_grasp_retreat.min_distance = 0.08;
     grasp.post_grasp_retreat.desired_distance = 0.1;
+    /*
+    grasp.post_grasp_retreat.direction.header.frame_id = "kinect2_rgb_optical_frame";
+    grasp.post_grasp_retreat.direction.vector.x = -best_grasp.approach.x;
+    grasp.post_grasp_retreat.direction.vector.y = -best_grasp.approach.y;
+    grasp.post_grasp_retreat.direction.vector.z = -best_grasp.approach.z;
+    */
     grasp.post_grasp_retreat.direction.header.frame_id = move_group.getPlanningFrame();
     grasp.post_grasp_retreat.direction.vector.z = 1.0;
-
+    
     res.grasps.push_back(grasp);
     res.error_code.val = moveit_msgs::MoveItErrorCodes::SUCCESS;
 
@@ -115,8 +138,8 @@ private:
 
   gpd::GraspConfigList grasp_candidates_;
   std::mutex m_;
-  ros::Publisher pose_pub_;
   ros::Subscriber clustered_grasps_sub_;
+  tf::TransformListener listener_;
 };
 
 int main(int argc, char **argv)
@@ -130,3 +153,4 @@ int main(int argc, char **argv)
 
   return 0;
 }
+

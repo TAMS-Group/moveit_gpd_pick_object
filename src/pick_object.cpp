@@ -9,6 +9,8 @@
 #include <moveit_msgs/AttachedCollisionObject.h>
 #include <moveit_msgs/ApplyPlanningScene.h>
 #include <moveit_msgs/Grasp.h>
+#include <moveit_msgs/GetPlanningScene.h>
+
 
 #include <manipulation_msgs/GraspPlanning.h>
 
@@ -34,6 +36,13 @@ public:
     return arm.planGraspsAndPick("bounding_box");
   }
 
+  bool executePick(moveit_msgs::CollisionObject &object)
+  {
+    arm.setPlanningTime(20.0);
+    arm.setSupportSurfaceName("table");
+    return arm.planGraspsAndPick(object);
+  }
+
   /**
    * Spawns a bounding box on the table. Only grasps inside the box are seen as valid.
    */
@@ -50,15 +59,15 @@ public:
 
     shape_msgs::SolidPrimitive primitive;
     primitive.type = primitive.BOX;
-    primitive.dimensions.push_back(0.70);
-    primitive.dimensions.push_back(0.60);
-
+    primitive.dimensions.push_back(0.80);
+    primitive.dimensions.push_back(1.00);
+    primitive.dimensions.push_back(0.50);
 
     geometry_msgs::Pose pose;
     pose.orientation.w = 1;
     pose.position.x = 0.0;
     pose.position.y = 0.0;
-    pose.position.z = primitive.dimensions[0] / 2 + 0.0;
+    pose.position.z = primitive.dimensions[2] / 2 + 0.0;
 
     bounding_box.primitives.push_back(primitive);
     bounding_box.primitive_poses.push_back(pose);
@@ -66,17 +75,43 @@ public:
     // add object to scene
     bounding_box.operation = bounding_box.ADD;
     planning_scene.world.collision_objects.push_back(bounding_box);
-    collision_detection::AllowedCollisionMatrix acm(planning_scene.allowed_collision_matrix);
-    acm.setDefaultEntry("bounding_box", true);
-    acm.getMessage(planning_scene.allowed_collision_matrix);
 
-    // remove attached object in case it is attached
+     // remove attached object in case it is attached
     moveit_msgs::AttachedCollisionObject aco;
     bounding_box.operation = bounding_box.REMOVE;
     aco.object = bounding_box;
     planning_scene.robot_state.attached_collision_objects.push_back(aco);
-
+    
+    // apply the new object
     psi.applyPlanningScene(planning_scene);
+
+    moveit_msgs::PlanningScene current_scene;
+    moveit_msgs::PlanningScene new_planning_scene;
+    new_planning_scene.is_diff = true;
+    new_planning_scene.robot_state.is_diff = true;
+
+    moveit_msgs::GetPlanningScene scene_srv;
+    
+    ros::NodeHandle nh;
+    ros::ServiceClient client_get_scene = nh.serviceClient<moveit_msgs::GetPlanningScene>("/get_planning_scene");
+    scene_srv.request.components.components = scene_srv.request.components.ALLOWED_COLLISION_MATRIX;
+    
+    if(!client_get_scene.call(scene_srv))
+    {
+      ROS_WARN("Failed to call service /get_planning_scene");
+    }
+    else
+    {
+      current_scene = scene_srv.response.scene;
+      collision_detection::AllowedCollisionMatrix acm(current_scene.allowed_collision_matrix);
+      std::vector<std::string> entries;
+      acm.getAllEntryNames(entries);
+      acm.setEntry("bounding_box", entries, true);
+      acm.setDefaultEntry("bounding_box", true);
+      acm.getMessage(new_planning_scene.allowed_collision_matrix);
+
+      psi.applyPlanningScene(new_planning_scene);
+    }
 
     return bounding_box;
   }
@@ -91,12 +126,12 @@ int main(int argc, char **argv)
 
   PickObject po;
   ROS_INFO("Spawn Bounding Box");
-
   moveit_msgs::CollisionObject object = po.spawnBoundingBox();
 
-  while (ros::ok())
-  {
+  ROS_INFO("Picking Object");
+  while(ros::ok())
+    po.executePick(object);
 
-  }
   return 0;
 }
+
