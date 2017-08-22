@@ -46,12 +46,14 @@
   <build_depend>std_msgs</build_depend>
   <build_depend>gpd</build_depend>
   <build_depend>tf</build_depend>
+  <build_depend>ros_pcl</build_depend>
   <run_depend>moveit_ros_planning_interface</run_depend>
   <run_depend>moveit_core</run_depend>
   <run_depend>roscpp</run_depend>
   <run_depend>std_msgs</run_depend>
   <run_depend>gpd</run_depend>
   <run_depend>tf</run_depend>
+  <run_depend>ros_pcl</run_depend>
 
 
   <!-- The export tag contains other, unspecified, tags -->

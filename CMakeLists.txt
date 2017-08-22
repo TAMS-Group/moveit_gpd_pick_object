@@ -13,8 +13,11 @@ find_package(catkin REQUIRED COMPONENTS
   moveit_core
   roscpp
   std_msgs
+  sensor_msgs
   gpd
   tf
+  pcl_ros
+  message_filters
 )
 
 ## System dependencies are found with CMake's conventions
@@ -207,3 +210,5 @@ target_link_libraries(pick_object ${catkin_LIBRARIES})
 add_executable(plan_grasps_service src/plan_grasps_service.cpp)
 target_link_libraries(plan_grasps_service ${catkin_LIBRARIES})
 
+add_executable(fuse_pcl src/fuse_pcl.cpp)
+target_link_libraries(fuse_pcl ${catkin_LIBRARIES})
