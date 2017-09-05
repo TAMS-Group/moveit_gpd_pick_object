@@ -9,9 +9,8 @@
   <arg name="node" />
 
   <param name="$(arg node)/finger_width" value="0.06" />
-  <!-- <param name="$(arg node)/hand_outer_diameter" value="0.09" /> -->
   <param name="$(arg node)/hand_outer_diameter" value="0.20" />
   <param name="$(arg node)/hand_depth" value="0.103" />
-  <param name="$(arg node)/hand_height" value="0.13" />
+  <param name="$(arg node)/hand_height" value="0.06" />
   <param name="$(arg node)/init_bite" value="0.01" />
 </launch>

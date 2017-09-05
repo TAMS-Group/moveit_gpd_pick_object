@@ -1,22 +1,23 @@
 <launch>
   <!-- Load hand geometry parameters -->
-  <include file="$(find tams_ur5_pick_object)/launch/ur5_geometry.launch">
+  <!-- <include file="$(find gpd)/launch/hand_geometry.launch"> -->
+  <include file="$(find tams_ur5_pick_object)/launch/gpd/ur5_geometry.launch">
     <arg name="node" value="detect_grasps" />
   </include>
 
   <!-- Load classifier parameters -->
-  <include file="$(find tams_ur5_pick_object)/launch/classifier_15channels.launch">
+  <include file="$(find tams_ur5_pick_object)/launch/gpd/classifier_15channels.launch">
     <arg name="node" value="detect_grasps" />
   </include>
 
-  <node name="detect_grasps" pkg="gpd" type="detect_grasps" output="screen">
+  <node name="detect_grasps" pkg="gpd" type="detect_grasps">
 
     <!-- If sequential importance sampling is used (default: false) -->
     <param name="use_importance_sampling" value="false" />
 
     <!-- What type of point cloud is used and what ROS topic it comes from -->
     <param name="cloud_type" value="0" /> <!-- 0: PointCloud2, 1: CloudSized, 2: CloudIndexed, 3: CloudSamples -->
-    <param name="cloud_topic" value="/kinect2/hd/points" />
+    <param name="cloud_topic" value="/kinect2/qhd/points" />
 
     <!-- (optional) The ROS topic that the samples come from (default: an empty string) -->
     <param name="samples_topic" value="" />
@@ -61,6 +62,6 @@
     <param name="min_score_diff" value="0" />
     <param name="min_aperture" value="0.029" />
     <param name="max_aperture" value="0.072" />
-    <param name="num_selected" value="5" />
+    <param name="num_selected" value="20" />
   </node>
 </launch>

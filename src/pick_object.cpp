@@ -20,38 +20,30 @@ public:
   moveit::planning_interface::MoveGroupInterface arm;
   moveit::planning_interface::MoveGroupInterface gripper;
   moveit::planning_interface::PlanningSceneInterface psi;
-  bool placed_object;
-  bool success;
 
-  PickObject() : arm("arm"), gripper("gripper"), placed_object(true), success(false)
+  PickObject() : arm("arm"), gripper("gripper")
   {
     ros::NodeHandle pnh("~");
     ros::NodeHandle nh;
-    
+ 
     pnh.param("box_x", box_x_, 0.60);
     pnh.param("box_y", box_y_, 0.80);
     pnh.param("box_z", box_z_, 0.50);
-    pnh.param("box_z_offset", box_z_offset_, 0.05);
-  }
-
-  ~PickObject()
-  {
+    pnh.param("box_z_offset", box_z_offset_, 0.04);
   }
 
   bool executePick()
   {
     arm.setPlanningTime(20.0);
-    arm.setSupportSurfaceName("table");
-    success = arm.planGraspsAndPick("bounding_box");
-    return success;
+    //arm.setSupportSurfaceName("");
+    return arm.planGraspsAndPick();
   }
 
   bool executePick(moveit_msgs::CollisionObject &object)
   {
     arm.setPlanningTime(20.0);
     arm.setSupportSurfaceName("table");
-    success = arm.planGraspsAndPick(object);
-    return success;
+    return arm.planGraspsAndPick(object);
   }
 
   /**
@@ -63,11 +55,11 @@ public:
     planning_scene.is_diff = true;
     planning_scene.robot_state.is_diff = true;
 
-    moveit_msgs::CollisionObject bounding_box;
+    moveit_msgs::CollisionObject empty_object;
 
-    bounding_box.header.frame_id = "table_top";
-    bounding_box.id = "bounding_box";
-
+    empty_object.header.frame_id = "table_top";
+    empty_object.id = "empty_object";
+ 
     shape_msgs::SolidPrimitive primitive;
     primitive.type = primitive.BOX;
     primitive.dimensions.push_back(box_x_);
@@ -80,19 +72,19 @@ public:
     pose.position.y = 0.0;
     pose.position.z = primitive.dimensions[2] / 2 + box_z_offset_;
 
-    bounding_box.primitives.push_back(primitive);
-    bounding_box.primitive_poses.push_back(pose);
+    empty_object.primitives.push_back(primitive);
+    empty_object.primitive_poses.push_back(pose);
 
     // add object to scene
-    bounding_box.operation = bounding_box.ADD;
-    planning_scene.world.collision_objects.push_back(bounding_box);
+    empty_object.operation = empty_object.ADD;
+    planning_scene.world.collision_objects.push_back(empty_object);
 
      // remove attached object in case it is attached
     moveit_msgs::AttachedCollisionObject aco;
-    bounding_box.operation = bounding_box.REMOVE;
-    aco.object = bounding_box;
+    empty_object.operation = empty_object.REMOVE;
+    aco.object = empty_object;
     planning_scene.robot_state.attached_collision_objects.push_back(aco);
-    
+ 
     // apply the new object
     psi.applyPlanningScene(planning_scene);
 
@@ -102,11 +94,11 @@ public:
     new_planning_scene.robot_state.is_diff = true;
 
     moveit_msgs::GetPlanningScene scene_srv;
-    
+ 
     ros::NodeHandle nh;
     ros::ServiceClient client_get_scene = nh.serviceClient<moveit_msgs::GetPlanningScene>("/get_planning_scene");
     scene_srv.request.components.components = scene_srv.request.components.ALLOWED_COLLISION_MATRIX;
-    
+ 
     if(!client_get_scene.call(scene_srv))
     {
       ROS_WARN("Failed to call service /get_planning_scene");
@@ -117,14 +109,14 @@ public:
       collision_detection::AllowedCollisionMatrix acm(current_scene.allowed_collision_matrix);
       std::vector<std::string> entries;
       acm.getAllEntryNames(entries);
-      acm.setEntry("bounding_box", entries, true);
-      acm.setDefaultEntry("bounding_box", true);
+      acm.setEntry("empty_object", entries, true);
+      acm.setDefaultEntry("empty_object", true);
       acm.getMessage(new_planning_scene.allowed_collision_matrix);
 
       psi.applyPlanningScene(new_planning_scene);
     }
 
-    return bounding_box;
+    return empty_object;
   }
 private:
   void jointValuesToJointTrajectory(std::map<std::string, double> target_values, trajectory_msgs::JointTrajectory &grasp_pose)
@@ -152,28 +144,39 @@ int main(int argc, char **argv)
   spinner.start();
 
   PickObject po;
+  /*
   ROS_INFO("Spawn Bounding Box");
   moveit_msgs::CollisionObject object = po.spawnBoundingBox();
   moveit_msgs::AttachedCollisionObject aco;
   aco.object = object;
   aco.object.operation = moveit_msgs::CollisionObject::REMOVE;
-  
+  */
+  bool success = false;
+
   ROS_INFO("Picking Object");
   while(ros::ok())
   {
-    if(po.success)
+    if(success)
     {
       po.arm.setNamedTarget("extended");
-      po.arm.move();
+      if(!po.arm.move())
+        ROS_ERROR("moving to extended pose failed.");
       po.gripper.setNamedTarget("open");
-      po.gripper.move();
+      if(!po.gripper.move())
+        ROS_ERROR("opening gripper failed.");
+      /*
       po.psi.applyAttachedCollisionObject(aco);
       po.spawnBoundingBox();
+      */
       po.arm.setNamedTarget("home");
-      po.arm.move();
+      if(!po.arm.move())
+        ROS_ERROR("moving home failed.");
       ros::Duration(10).sleep();
+      success = false;
     }
-    po.executePick(object);
+    success = po.executePick();
+    if(!success)
+      ROS_ERROR("picking failed");
   }
 
   return 0;
