@@ -21,8 +21,6 @@ public:
     grasps_visualization_pub_ = n.advertise<geometry_msgs::PoseArray>("grasps_visualization", 10);
     ros::NodeHandle pn("~");
 
-    pn.param("frame_id", frame_id_, std::string("kinect2_rgb_optical_frame"));
-
     pn.param("bound_frame", bound_frame_, std::string("table_top"));
     pn.param("x_bound", x_bound_, 0.60);
     pn.param("y_bound", y_bound_, 0.80);
@@ -36,13 +34,11 @@ public:
     moveit::planning_interface::MoveGroupInterface move_group("arm");
     moveit::planning_interface::MoveGroupInterface gripper(move_group.getRobotModel()->getEndEffectors()[0]->getName());
  
-    // The parts set here in grasp candidate are the same for all grasps
+    // Setting variables in grasp_candidate_ that are the same for every grasp
     grasp_candidate_.id = "grasp";
-    grasp_candidate_.grasp_pose.header.frame_id = frame_id_;
 
     grasp_candidate_.pre_grasp_approach.min_distance = 0.08;
     grasp_candidate_.pre_grasp_approach.desired_distance = 0.1;
-    grasp_candidate_.pre_grasp_approach.direction.header.frame_id = frame_id_;
 
     grasp_candidate_.post_grasp_retreat.min_distance = 0.13;
     grasp_candidate_.post_grasp_retreat.desired_distance = 0.15;
@@ -51,12 +47,15 @@ public:
 
     jointValuesToJointTrajectory(gripper.getNamedTargetValues("open"), ros::Duration(1.0), grasp_candidate_.pre_grasp_posture);
     jointValuesToJointTrajectory(gripper.getNamedTargetValues("closed"), ros::Duration(2.0), grasp_candidate_.grasp_posture);
- }
+  }
 
   void clustered_grasps_callback(const gpd::GraspConfigList::ConstPtr& msg)
   {
     std::lock_guard<std::mutex> lock(m_);
     ros::Time grasp_stamp = msg->header.stamp;
+    frame_id_ = msg->header.frame_id;
+    grasp_candidate_.grasp_pose.header.frame_id = frame_id_;
+    grasp_candidate_.pre_grasp_approach.direction.header.frame_id = frame_id_;
 
     for(auto grasp:msg->grasps)
     {
@@ -88,17 +87,17 @@ public:
     // transform the grasp point into the frame of the bound to make the boundary check easier
     try
     {
-      listener_.transformPoint(bound_frame_, grasp_point, transformed_grasp_point); 
+      listener_.transformPoint(bound_frame_, grasp_point, transformed_grasp_point);
     }
     catch( tf::TransformException ex)
     {
       ROS_ERROR("transfrom exception : %s",ex.what());
     }
 
-    return (transformed_grasp_point.point.x < x_bound_*0.5+x_bound_offset_ 
-         && transformed_grasp_point.point.x > -x_bound_*0.5+x_bound_offset_ 
+    return (transformed_grasp_point.point.x < x_bound_*0.5+x_bound_offset_
+         && transformed_grasp_point.point.x > -x_bound_*0.5+x_bound_offset_
          && transformed_grasp_point.point.y < y_bound_*0.5+y_bound_offset_
-         && transformed_grasp_point.point.y > -y_bound_*0.5+y_bound_offset_ 
+         && transformed_grasp_point.point.y > -y_bound_*0.5+y_bound_offset_
          && transformed_grasp_point.point.z < z_bound_*0.5+z_bound_offset_
          && transformed_grasp_point.point.z > -z_bound_*0.5+z_bound_offset_);
   }
@@ -132,6 +131,7 @@ public:
       std::lock_guard<std::mutex> lock(m_);
       for (auto grasp_candidate:grasp_candidates_)
       {
+        // after the first grasp older than 10 seconds is found, break for loop
         if(grasp_candidate.second.sec < ros::Time::now().sec - 10.0)
           break;
         res.grasps.push_back(grasp_candidate.first);
@@ -174,8 +174,10 @@ private:
   std::mutex m_;
   ros::Subscriber clustered_grasps_sub_;
   tf::TransformListener listener_;
-  std::string frame_id_;
   ros::Publisher grasps_visualization_pub_;
+
+  // frame of the grasp
+  std::string frame_id_;
 
   // frame of the bound that determines which grasps are valid
   std::string bound_frame_;
