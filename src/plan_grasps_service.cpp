@@ -132,7 +132,7 @@ public:
       for (auto grasp_candidate:grasp_candidates_)
       {
         // after the first grasp older than 10 seconds is found, break for loop
-        if(grasp_candidate.second.sec < ros::Time::now().sec - 10.0)
+        if(grasp_candidate.second.sec < ros::Time::now().sec - 5.0)
           break;
         res.grasps.push_back(grasp_candidate.first);
         grasps_visualization.poses.push_back(grasp_candidate.first.grasp_pose.pose);

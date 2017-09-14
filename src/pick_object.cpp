@@ -70,15 +70,15 @@ int main(int argc, char **argv)
     if(success)
     {
       po.arm.setNamedTarget("extended");
-      if(!po.arm.move())
+      while(!po.arm.move())
         ROS_ERROR("moving to extended pose failed.");
       po.gripper.setNamedTarget("open");
-      if(!po.gripper.move())
+      while(!po.gripper.move())
         ROS_ERROR("opening gripper failed.");
       po.arm.setNamedTarget("home");
-      if(!po.arm.move())
+      while(!po.arm.move())
         ROS_ERROR("moving home failed.");
-      ros::Duration(10).sleep();
+      ros::Duration(5).sleep();
       success = false;
     }
     success = po.executePick();
