@@ -1,0 +1,40 @@
+<launch>
+  <include file="$(find moveit_gpd_pick_object)/launch/gpd/gpd.launch">
+    <arg name="cloud_topic" value="kinect2/qhd/points" />
+    <arg name="node" value="detect_grasps" />
+
+    <!-- Hand geometry parameters
+
+    hand_depth: the finger length (measured from hand base to finger tip)
+    init_bite: the minimum distance between the fingertip and the side of the object that is oriented toward the hand
+    -->
+    <arg name="finger_width" value="0.06" />
+    <arg name="hand_outer_diameter" value="0.20" />
+    <arg name="hand_depth" value="0.103" />
+    <arg name="hand_height" value="0.06" />
+    <arg name="init_bite" value="0.01" />
+
+    
+  </include>
+  <node name="plan_gpd_grasps_service" pkg="moveit_gpd_pick_object" type="plan_grasps_service">
+
+    <param name="bound_frame" value="table_top" />
+
+    <!-- Size of the bound determining if a grasp is valid -->
+    <param name="x_bound" value="0.60" />
+    <param name="y_bound" value="0.80" />
+    <param name="z_bound" value="0.50" />
+    
+    <!-- Offset of the bound from the origin of the frame -->
+    <param name="x_bound_offset" value="0.0" />
+    <param name="y_bound_offset" value="0.0" />
+    <param name="z_bound_offset" value="0.29" />
+    <param name="grasp_offset" value="-0.08" />
+
+    <!-- grasps older than this value in seconds won't be considered anymore -->
+    <param name="grasp_cache_time_threshold" value="5.0" />
+
+    <param name="move_group_arm" value="arm" />
+    <param name="move_group_gripper" value="gripper" />
+  </node>
+<launch>

@@ -1,5 +1,0 @@
-<launch>
-  <include file="$(find tams_ur5_pick_object)/launch/gpd/gpd.launch"/>
-  <node name="plan_grasps_service" pkg="tams_ur5_pick_object" type="plan_grasps_service"/>
-  <node name="pick_object" pkg="tams_ur5_pick_object" type="pick_object"/>
-</launch>

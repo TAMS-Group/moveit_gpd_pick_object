@@ -1,0 +1,4 @@
+<launch>
+  <include file="$(find moveit_gpd_pick_object)/launch/gpd_pick_object_service.launch"/>
+  <node name="pick_object_demo" pkg="moveit_gpd_pick_object" type="pick_object_demo"/>
+</launch>

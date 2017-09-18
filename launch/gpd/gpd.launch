@@ -1,23 +1,31 @@
 <launch>
-  <!-- Load hand geometry parameters -->
-  <!-- <include file="$(find gpd)/launch/hand_geometry.launch"> -->
-  <include file="$(find tams_ur5_pick_object)/launch/gpd/ur5_geometry.launch">
-    <arg name="node" value="detect_grasps" />
-  </include>
+  <arg name="cloud_topic" />
+  <arg name="node" />
+  <arg name="finger_width" />
+  <arg name="hand_outer_diameter" />
+  <arg name="hand_depth" />
+  <arg name="hand_height" />
+  <arg name="init_bite" />
+
+  <param name="$(arg node)/finger_width" value="$(arg finger_width)" />
+  <param name="$(arg node)/hand_outer_diameter" value="$(arg hand_outer_diameter)" />
+  <param name="$(arg node)/hand_depth" value="$(arg hand_depth)" />
+  <param name="$(arg node)/hand_height" value="$(arg hand_height)" />
+  <param name="$(arg node)/init_bite" value="$(arg init_bite)" />
 
   <!-- Load classifier parameters -->
-  <include file="$(find tams_ur5_pick_object)/launch/gpd/classifier_15channels.launch">
+  <include file="$(find moveit_gpd_pick_object)/launch/gpd/classifier_15channels.launch">
     <arg name="node" value="detect_grasps" />
   </include>
 
-  <node name="detect_grasps" pkg="gpd" type="detect_grasps">
+  <node name="$(arg node)" pkg="gpd" type="detect_grasps">
 
     <!-- If sequential importance sampling is used (default: false) -->
     <param name="use_importance_sampling" value="false" />
 
     <!-- What type of point cloud is used and what ROS topic it comes from -->
     <param name="cloud_type" value="0" /> <!-- 0: PointCloud2, 1: CloudSized, 2: CloudIndexed, 3: CloudSamples -->
-    <param name="cloud_topic" value="/kinect2/qhd/points" />
+    <param name="cloud_topic" value="$(arg cloud_topic)" />
 
     <!-- (optional) The ROS topic that the samples come from (default: an empty string) -->
     <param name="samples_topic" value="" />
