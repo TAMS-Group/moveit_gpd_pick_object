@@ -1,7 +1,6 @@
 <launch>
   <include file="$(find moveit_gpd_pick_object)/launch/gpd/gpd.launch">
     <arg name="cloud_topic" value="/kinect2/qhd/points" />
-    <arg name="node" value="detect_grasps" />
 
     <!-- Hand geometry parameters
 
@@ -29,6 +28,8 @@
     <param name="x_bound_offset" value="0.0" />
     <param name="y_bound_offset" value="0.0" />
     <param name="z_bound_offset" value="0.29" />
+
+    <!-- Offset of the gripper endeffector link from the detected grasp -->
     <param name="grasp_offset" value="-0.08" />
 
     <!-- grasps older than this value in seconds won't be considered anymore -->

@@ -1,24 +1,22 @@
 <launch>
   <arg name="cloud_topic" />
-  <arg name="node" />
   <arg name="finger_width" />
   <arg name="hand_outer_diameter" />
   <arg name="hand_depth" />
   <arg name="hand_height" />
   <arg name="init_bite" />
 
-  <param name="$(arg node)/finger_width" value="$(arg finger_width)" />
-  <param name="$(arg node)/hand_outer_diameter" value="$(arg hand_outer_diameter)" />
-  <param name="$(arg node)/hand_depth" value="$(arg hand_depth)" />
-  <param name="$(arg node)/hand_height" value="$(arg hand_height)" />
-  <param name="$(arg node)/init_bite" value="$(arg init_bite)" />
-
   <!-- Load classifier parameters -->
   <include file="$(find moveit_gpd_pick_object)/launch/gpd/classifier_15channels.launch">
     <arg name="node" value="detect_grasps" />
   </include>
 
-  <node name="$(arg node)" pkg="gpd" type="detect_grasps">
+  <node name="detect_grasps" pkg="gpd" type="detect_grasps">
+    <param name="finger_width" value="$(arg finger_width)" />
+    <param name="hand_outer_diameter" value="$(arg hand_outer_diameter)" />
+    <param name="hand_depth" value="$(arg hand_depth)" />
+    <param name="hand_height" value="$(arg hand_height)" />
+    <param name="init_bite" value="$(arg init_bite)" />
 
     <!-- If sequential importance sampling is used (default: false) -->
     <param name="use_importance_sampling" value="false" />
