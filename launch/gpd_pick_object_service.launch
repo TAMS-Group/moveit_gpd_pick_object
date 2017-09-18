@@ -1,6 +1,6 @@
 <launch>
   <include file="$(find moveit_gpd_pick_object)/launch/gpd/gpd.launch">
-    <arg name="cloud_topic" value="kinect2/qhd/points" />
+    <arg name="cloud_topic" value="/kinect2/qhd/points" />
     <arg name="node" value="detect_grasps" />
 
     <!-- Hand geometry parameters
@@ -37,4 +37,4 @@
     <param name="move_group_arm" value="arm" />
     <param name="move_group_gripper" value="gripper" />
   </node>
-<launch>
+</launch>

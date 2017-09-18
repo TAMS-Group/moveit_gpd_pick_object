@@ -35,8 +35,8 @@ public:
 
     std::string move_group_arm;
     std::string move_group_gripper;
-    pn.param("move_group_arm", move_group_arm, "arm");
-    pn.param("move_group_gripper", move_group_gripper, "gripper");
+    pn.param("move_group_arm", move_group_arm, std::string("arm"));
+    pn.param("move_group_gripper", move_group_gripper, std::string("gripper"));
  
     moveit::planning_interface::MoveGroupInterface move_group(move_group_arm);
     moveit::planning_interface::MoveGroupInterface gripper(move_group_gripper);
@@ -151,7 +151,7 @@ public:
     }
     else
     {
-      ROS_INFO("%f grasps found.", res.grasps.size());
+      ROS_INFO("%ld grasps found.", res.grasps.size());
       res.error_code.val = moveit_msgs::MoveItErrorCodes::SUCCESS;
     }
     grasps_visualization_pub_.publish(grasps_visualization);
