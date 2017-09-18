@@ -30,9 +30,16 @@ public:
     pn.param("z_bound_offset", z_bound_offset_, 0.29);
 
     pn.param("grasp_offset", grasp_offset_, -0.08);
+
+    pn.param("grasp_cache_time_threshold", grasp_cache_time_threshold_, 5.0);
+
+    std::string move_group_arm;
+    std::string move_group_gripper;
+    pn.param("move_group_arm", move_group_arm, "arm");
+    pn.param("move_group_gripper", move_group_gripper, "gripper");
  
-    moveit::planning_interface::MoveGroupInterface move_group("arm");
-    moveit::planning_interface::MoveGroupInterface gripper(move_group.getRobotModel()->getEndEffectors()[0]->getName());
+    moveit::planning_interface::MoveGroupInterface move_group(move_group_arm);
+    moveit::planning_interface::MoveGroupInterface gripper(move_group_gripper);
  
     // Setting variables in grasp_candidate_ that are the same for every grasp
     grasp_candidate_.id = "grasp";
@@ -59,6 +66,11 @@ public:
 
     for(auto grasp:msg->grasps)
     {
+      // shift the grasp according to the offset parameter
+      grasp.top.x = grasp.top.x + grasp_offset_ * grasp.approach.x;
+      grasp.top.y = grasp.top.y + grasp_offset_ * grasp.approach.y;
+      grasp.top.z = grasp.top.z + grasp_offset_ * grasp.approach.z;
+
       if(grasp_boundry_check(grasp))
       {
         grasp_candidate_.grasp_pose.pose = gpd_grasp_to_pose(grasp);
@@ -76,14 +88,10 @@ public:
   bool grasp_boundry_check(gpd::GraspConfig &grasp)
   {
     geometry_msgs::PointStamped grasp_point;
-    grasp_point.header.frame_id = frame_id_;
     geometry_msgs::PointStamped transformed_grasp_point;
+    grasp_point.header.frame_id = frame_id_;
  
-    // shift the grasp according to the offset parameter 
-    grasp_point.point.x = grasp.top.x + grasp_offset_ * grasp.approach.x;
-    grasp_point.point.y = grasp.top.y + grasp_offset_ * grasp.approach.y;
-    grasp_point.point.z = grasp.top.z + grasp_offset_ * grasp.approach.z;
-
+    grasp_point.point = grasp.top;
     // transform the grasp point into the frame of the bound to make the boundary check easier
     try
     {
@@ -111,13 +119,9 @@ public:
 
     tf::Quaternion orientation_quat;
     orientation.getRotation(orientation_quat);
-    geometry_msgs::Quaternion orientation_quat_msg;
-    tf::quaternionTFToMsg(orientation_quat, orientation_quat_msg);
-    pose.orientation = orientation_quat_msg;
+    tf::quaternionTFToMsg(orientation_quat, pose.orientation);
 
-    pose.position.x = grasp.top.x + grasp_offset_ * grasp.approach.x;
-    pose.position.y = grasp.top.y + grasp_offset_ * grasp.approach.y;
-    pose.position.z = grasp.top.z + grasp_offset_ * grasp.approach.z;
+    pose.position = grasp.top;
 
     return pose;
   }
@@ -131,8 +135,8 @@ public:
       std::lock_guard<std::mutex> lock(m_);
       for (auto grasp_candidate:grasp_candidates_)
       {
-        // after the first grasp older than 10 seconds is found, break for loop
-        if(grasp_candidate.second.sec < ros::Time::now().sec - 5.0)
+        // after the first grasp older than the set amount of seconds is found, break the loop
+        if(grasp_candidate.second.sec < ros::Time::now().sec - grasp_cache_time_threshold_)
           break;
         res.grasps.push_back(grasp_candidate.first);
         grasps_visualization.poses.push_back(grasp_candidate.first.grasp_pose.pose);
@@ -142,14 +146,16 @@ public:
 
     if(res.grasps.empty())
     {
-      ROS_ERROR("No valid grasp found.");
+      ROS_INFO("No valid grasp found.");
       res.error_code.val = moveit_msgs::MoveItErrorCodes::FAILURE;
-      return false;
     }
-
-    ROS_INFO("Grasps found.");
+    else
+    {
+      ROS_INFO("%f grasps found.", res.grasps.size());
+      res.error_code.val = moveit_msgs::MoveItErrorCodes::SUCCESS;
+    }
     grasps_visualization_pub_.publish(grasps_visualization);
-    res.error_code.val = moveit_msgs::MoveItErrorCodes::SUCCESS;
+
     return true;
   }
 
@@ -194,6 +200,9 @@ private:
 
   // offset of the grasp along the approach vector
   double grasp_offset_;
+
+  // grasps older than this threshold are not considered anymore
+  double grasp_cache_time_threshold_;
 };
 
 int main(int argc, char **argv)
@@ -203,10 +212,7 @@ int main(int argc, char **argv)
   PlanGPDGrasp p_gpd_g(n);
 
   ros::ServiceServer ss = n.advertiseService("plan_grasps", &PlanGPDGrasp::plan_gpd_grasp, &p_gpd_g);
-  while(ros::ok())
-  {
-    ros::spin();
-  }
+  ros::spin();
 
   return 0;
 }
