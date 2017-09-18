@@ -62,8 +62,6 @@ int main(int argc, char **argv)
       success = false;
     }
     success = po.executePick();
-    if(!success)
-      ROS_ERROR("picking failed");
   }
 
   return 0;
