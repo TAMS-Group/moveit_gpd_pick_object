@@ -22,9 +22,11 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-add_executable(pick_object_demo src/pick_object_demo.cpp)
-target_link_libraries(pick_object_demo ${catkin_LIBRARIES})
-
 add_executable(plan_grasps_service src/plan_grasps_service.cpp)
 target_link_libraries(plan_grasps_service ${catkin_LIBRARIES})
 
+add_executable(pick_object_demo src/pick_object_demo.cpp)
+target_link_libraries(pick_object_demo ${catkin_LIBRARIES})
+
+add_executable(examine_grasps src/examine_grasps.cpp)
+target_link_libraries(examine_grasps ${catkin_LIBRARIES})
