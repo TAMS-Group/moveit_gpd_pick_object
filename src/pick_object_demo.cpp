@@ -30,7 +30,7 @@ public:
   bool executePick()
   {
     arm.setPlanningTime(20.0);
-    return arm.planGraspsAndPick();
+    return arm.planGraspsAndPick() == moveit_msgs::MoveItErrorCodes::SUCCESS;
   }
 };
 
